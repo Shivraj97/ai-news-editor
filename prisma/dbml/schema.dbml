@@ -1,0 +1,191 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Table User {
+  id String [pk]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  name String [not null]
+  image String
+  Admin Admin
+  Reporter Reporter
+  Feedbacks Feedback [not null]
+  CreditBalance CreditBalance
+  MyEditors Editor [not null]
+  FavoriteEditors Editor [not null]
+}
+
+Table Admin {
+  id String [pk]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  User User [not null]
+}
+
+Table Reporter {
+  id String [pk]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  User User [not null]
+  Articles Article [not null]
+}
+
+Table Article {
+  id Int [pk, increment]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  title String [not null]
+  body String [not null]
+  summary String
+  published Boolean [not null, default: false]
+  tags String[] [not null]
+  Feedbacks Feedback [not null]
+  Reporter Reporter [not null]
+  reporterId String [not null]
+  EditorArticles EditorArticle [not null]
+}
+
+Table Feedback {
+  id Int [pk, increment]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  uid String [not null]
+  articleId Int [not null]
+  user User [not null]
+  article Article [not null]
+  type FeedbackType [not null]
+
+  indexes {
+    (uid, articleId) [unique]
+  }
+}
+
+Table CreditBalance {
+  id Int [pk, increment]
+  userId String [unique, not null]
+  balance Float [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  user User [not null]
+  Transactions Transaction [not null]
+}
+
+Table Transaction {
+  id Int [pk, increment]
+  userId String [not null]
+  notes String
+  amount Float [not null]
+  inputTokens Int [not null, default: 0]
+  outputTokens Int [not null, default: 0]
+  createdAt DateTime [default: `now()`, not null]
+  creditBalanceId Int [not null]
+  CreditBalance CreditBalance [not null]
+}
+
+Table Editor {
+  id Int [pk, increment]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  name String [not null]
+  imagePublicId String
+  language Language [not null, default: 'ENGLISH']
+  style Style [not null]
+  verbosity Verbosity [not null]
+  wordComplexity WordComplexity [not null]
+  additionalNotes String
+  User User [not null]
+  userId String [not null]
+  FavoritedBy User [not null]
+  EditorArticles EditorArticle [not null]
+}
+
+Table EditorArticle {
+  id Int [pk, increment]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  title String [not null]
+  body String [not null]
+  summary String
+  Editor Editor [not null]
+  editorId Int [not null]
+  OriginalArticle Article [not null]
+  originalArticleId Int [not null]
+
+  indexes {
+    (editorId, originalArticleId) [unique]
+  }
+}
+
+Table favoriteEditors {
+  favoriteeditorsId Int [ref: > Editor.id]
+  favoritedbyId String [ref: > User.id]
+}
+
+Enum FeedbackType {
+  LOVE
+  LIKE
+  DISLIKE
+  HATE
+}
+
+Enum Language {
+  ENGLISH
+  TAMIL
+  HINDI
+  FRENCH
+  SPANISH
+  GERMAN
+  MANDARIN
+  JAPANESE
+}
+
+Enum Style {
+  SENSATIONALIST
+  CHEERLEADER_HYPE
+  POETIC_DESCRIPTIVE
+  STRAIGHTFORWARD_FACTUAL
+  CONSPIRACY_THEORIST
+  CELEBRITY_GOSSIP
+  BREAKING_NEWS_URGENCY
+  HAIKU
+  SHAKESPEAREAN_DRAMATIC
+  MOVIE_TRAILER_VOICEOVER
+  RALLY_CRY_RHETORIC
+  LEGAL_FORMALITIES
+  ACADEMIC_ANALYTICAL
+  SATIRICAL_HUMOR
+  CONVERSATIONAL_BLOG
+}
+
+Enum Verbosity {
+  SUCCINCT
+  MODERATE
+  ELABORATE
+}
+
+Enum WordComplexity {
+  ELEMENTARY
+  INTERMEDIATE
+  SOPHISTICATED
+}
+
+Ref: Admin.id - User.id
+
+Ref: Reporter.id - User.id
+
+Ref: Article.reporterId > Reporter.id
+
+Ref: Feedback.uid > User.id
+
+Ref: Feedback.articleId > Article.id
+
+Ref: CreditBalance.userId - User.id [delete: Cascade]
+
+Ref: Transaction.creditBalanceId > CreditBalance.id [delete: Cascade]
+
+Ref: Editor.userId > User.id [delete: Cascade]
+
+Ref: EditorArticle.editorId > Editor.id [delete: Cascade]
+
+Ref: EditorArticle.originalArticleId > Article.id [delete: Cascade]
