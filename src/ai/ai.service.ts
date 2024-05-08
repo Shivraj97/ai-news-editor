@@ -2,8 +2,15 @@ import { Index, Pinecone, RecordMetadata } from '@pinecone-database/pinecone'
 import { INDEX_NAME } from './constants'
 import { TRPCError } from '@trpc/server'
 import { RouterOutputs } from '../trpc/clients/types'
-import { FeedbackType } from '@prisma/client'
+import { Article, Editor, FeedbackType } from '@prisma/client'
 import Anthropic from '@anthropic-ai/sdk'
+import {
+  stylePrompts,
+  verbosityPrompts,
+  wordComplexityPrompts,
+} from './prompts'
+import { MessageParam } from '@anthropic-ai/sdk/resources/messages.mjs'
+import { prisma } from '@/db'
 
 export class AIService {
   private readonly pineconeIndex: Index<RecordMetadata>
@@ -128,6 +135,94 @@ export class AIService {
     [FeedbackType.LIKE]: 0.15,
     [FeedbackType.DISLIKE]: -0.15,
     [FeedbackType.HATE]: -0.3,
+  }
+
+  async writeEditorArticle(article: Article, editor: Editor, userId: string) {
+    const messages: MessageParam[] = []
+    messages.push({
+      role: 'user',
+      content: `
+      Article title: ${article.title}
+      Article body: ${article.body},
+
+      style: ${editor.style}
+      styleDescription: ${stylePrompts[editor.style]}
+
+      verbosity: ${editor.verbosity}
+      verbosityDescription: ${verbosityPrompts[editor.verbosity]}
+
+      wordComplexity: ${editor.wordComplexity}
+      wordComplexityDescription: ${wordComplexityPrompts[editor.wordComplexity]}
+
+      language: Please use the language ${editor.language}
+
+      ${editor.additionalNotes ? 'Additional notes: ' + editor.additionalNotes : null}
+      `,
+    })
+    try {
+      const response = await this.anthropic.messages.create({
+        model: 'claude-3-sonnet-20240229',
+        messages,
+        max_tokens: 1000,
+        system:
+          'You are a news editor. Without any preamble or introduction, Rewrite the given article to suit the users requirements.',
+      })
+      // Todo: Update credit balance
+      const { input_tokens: inputTokens, output_tokens: outputTokens } =
+        response.usage
+      const usage =
+        (inputTokens * 3) / 1_000_000 + (outputTokens * 15) / 1_000_000
+
+      await prisma.creditBalance.upsert({
+        where: { userId },
+        create: {
+          balance: -usage,
+          userId,
+          Transactions: {
+            create: {
+              amount: -usage,
+              inputTokens,
+              outputTokens,
+              userId,
+              notes: `Rewrite article "${article.title}" with "${editor.name}".`,
+            },
+          },
+        },
+        update: {
+          balance: { decrement: usage },
+          Transactions: {
+            create: {
+              amount: -usage,
+              inputTokens,
+              outputTokens,
+              userId,
+              notes: `Rewrite article "${article.title}" with "${editor.name}".`,
+            },
+          },
+        },
+      })
+      const rewrittenArticle = response.content[0].text
+
+      const editorArticle = await prisma.editorArticle.create({
+        data: {
+          body: rewrittenArticle,
+          title: article.title,
+          editorId: editor.id,
+          originalArticleId: article.id,
+        },
+        include: {
+          Editor: true,
+          OriginalArticle: true,
+        },
+      })
+      return editorArticle
+    } catch (error) {
+      console.log('Error', error)
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Something went wrong.',
+      })
+    }
   }
   private createEmbedding = (content: string) => {
     const apiUrl = 'https://api.voyageai.com/v1/embeddings'

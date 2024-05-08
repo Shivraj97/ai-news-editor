@@ -10,6 +10,7 @@ import {
   schemaUpdateArticle,
 } from '../../../forms/schemas'
 import { fetchAndScoreRelatedArticles } from './shared/articles'
+import { z } from 'zod'
 
 export const articleRoutes = createTRPCRouter({
   create: protectedProcedure('admin', 'reporter')
@@ -63,5 +64,50 @@ export const articleRoutes = createTRPCRouter({
       const { ai, db } = ctx
       return fetchAndScoreRelatedArticles({ ai, db, id: id.toString() })
     }),
-  // editorArticle: protectedProcedure(),
+  editorArticle: protectedProcedure()
+    .input(schemaNumberID)
+    .input(z.object({ editorId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const { id, editorId } = input
+
+      const [article, editor] = await Promise.all([
+        ctx.db.article.findUnique({
+          where: { id },
+        }),
+        ctx.db.editor.findUnique({
+          where: { id: editorId },
+        }),
+      ])
+
+      if (!article) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Article not found.',
+        })
+      }
+
+      if (!editor) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Editor not found.',
+        })
+      }
+      const editorArticle = await ctx.db.editorArticle.findUnique({
+        where: {
+          editorId_originalArticleId: {
+            editorId,
+            originalArticleId: id,
+          },
+        },
+        include: {
+          OriginalArticle: true,
+          Editor: true,
+        },
+      })
+      if (editorArticle?.OriginalArticle) {
+        return editorArticle
+      } else {
+        return ctx.ai.writeEditorArticle(article, editor, ctx.userId)
+      }
+    }),
 })

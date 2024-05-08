@@ -19,4 +19,7 @@ export const userRoutes = createTRPCRouter({
 
     return { balance: balance?.balance || 0, editors }
   }),
+  findAll: protectedProcedure('admin').query(({ ctx }) => {
+    return ctx.db.user.findMany()
+  }),
 })

@@ -31,7 +31,9 @@ export const ReactionButton = ({
     <Button
       size={'icon'}
       variant={'ghost'}
-      onClick={async () => {
+      onClick={async (e) => {
+        e.preventDefault()
+        e.stopPropagation()
         await giveFeedback({
           articleId,
           type,
@@ -40,7 +42,7 @@ export const ReactionButton = ({
       loading={isLoading}
       className={cn(
         'transition-all',
-        selected ? 'shadow-lg border border-black scale-110' : '',
+        selected ? 'shadow-lg rounded-full' : '',
       )}
     >
       {Icon}
